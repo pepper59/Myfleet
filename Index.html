@@ -1,0 +1,1618 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#071525">
+<title>MyFleet — Flotte & Carte Interactive</title>
+
+<!-- Leaflet CSS & JS pour la carte interactive -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<style>
+:root {
+  --bg: #07111f;
+  --panel: #0d2034;
+  --panel2: #102a43;
+  --line: #1b3b58;
+  --text: #eef6ff;
+  --muted: #9bb1c8;
+  --blue: #39a2ff;
+  --green: #48d6a0;
+  --orange: #ffbd69;
+  --red: #ff7777;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: radial-gradient(ellipse at top, #102b45 0%, #07111f 55%);
+  color: var(--text);
+  font: 15px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  min-height: 100vh;
+}
+button, input, select, textarea { font: inherit; }
+button {
+  cursor: pointer;
+  border: 0;
+  border-radius: 12px;
+  padding: 11px 14px;
+  background: var(--blue);
+  color: #041323;
+  font-weight: 750;
+  transition: opacity .15s;
+}
+button:hover { opacity: .9; }
+button.secondary { background: #173650; color: var(--text); border: 1px solid var(--line); }
+button.danger { background: #492532; color: #ffdbe0; border: 1px solid #773548; }
+
+input, select, textarea {
+  width: 100%;
+  padding: 11px 12px;
+  background: #081827;
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 10px;
+  outline: none;
+}
+input:focus, select:focus, textarea:focus { border-color: var(--blue); }
+label { display: block; color: var(--muted); font-size: 12px; margin: 0 0 6px; }
+h1, h2, h3, p { margin-top: 0; }
+h1 { font-size: 25px; letter-spacing: -.6px; margin-bottom: 3px; }
+h2 { font-size: 19px; margin-bottom: 12px; }
+h3 { font-size: 15px; margin-bottom: 6px; }
+
+.muted { color: var(--muted); }
+.tiny { font-size: 12px; color: var(--muted); }
+.app { max-width: 1120px; margin: auto; padding: 20px 18px 100px; }
+
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
+.brand { display: flex; gap: 12px; align-items: center; }
+.logo {
+  width: 45px; height: 45px; border-radius: 14px;
+  background: linear-gradient(135deg, #41b4ff, #1669c8);
+  display: grid; place-items: center; font-size: 24px;
+  box-shadow: 0 8px 28px #168aff30;
+}
+.pill { border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; color: #a7d9ff; font-size: 11px; white-space: nowrap; }
+
+.tabs { display: flex; gap: 7px; overflow: auto; margin: 0 0 20px; padding-bottom: 4px; }
+.tab { background: #0b1c2c; color: var(--muted); border: 1px solid var(--line); white-space: nowrap; }
+.tab.active { background: #173d5d; color: white; border-color: #2f83c5; }
+
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 12px; margin-bottom: 22px; }
+.stat, .panel, .aircraft, .flight {
+  background: linear-gradient(145deg, #102941, #0a1b2c);
+  border: 1px solid var(--line);
+  border-radius: 17px;
+}
+.stat { padding: 16px; }
+.stat strong { font-size: 23px; display: block; margin-top: 4px; }
+.stat span { font-size: 12px; color: var(--muted); }
+
+.sectionhead { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 20px 0 12px; }
+.searchrow { display: flex; gap: 10px; margin-bottom: 14px; }
+.searchrow input { max-width: 320px; }
+
+.fleet { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 14px; }
+.aircraft { overflow: hidden; cursor: pointer; transition: transform .15s, border-color .15s; }
+.aircraft:hover { transform: translateY(-2px); border-color: #367db0; }
+.planeimg { height: 145px; background: linear-gradient(140deg, #1c4d71, #0a1726); display: grid; place-items: center; position: relative; overflow: hidden; }
+.planeimg img { width: 100%; height: 100%; object-fit: cover; }
+.planeemoji { font-size: 68px; filter: drop-shadow(0 8px 12px #0008); }
+.status { position: absolute; left: 12px; top: 12px; border-radius: 99px; background: #08291f; color: var(--green); font-size: 11px; padding: 5px 9px; border: 1px solid #1c5d4b; }
+
+.airbody { padding: 14px; }
+.airtitle { display: flex; justify-content: space-between; gap: 8px; }
+.airtitle h3 { font-size: 16px; }
+.specs { display: flex; gap: 12px; flex-wrap: wrap; color: var(--muted); font-size: 12px; margin-top: 12px; }
+.specs b { color: #e4f2ff; font-weight: 650; }
+
+.empty { padding: 35px 20px; text-align: center; border: 1px dashed #31516b; border-radius: 16px; color: var(--muted); }
+.view { display: none; }
+.view.active { display: block; }
+.panel { padding: 18px; margin-bottom: 14px; }
+
+.detailhero { border-radius: 18px; overflow: hidden; border: 1px solid var(--line); margin-bottom: 15px; }
+.detailphoto { height: 220px; display: grid; place-items: center; background: linear-gradient(130deg, #1d4d72, #091522); font-size: 90px; position: relative; }
+.detailphoto img { width: 100%; height: 100%; object-fit: cover; }
+.detailinfo { padding: 18px; background: #0d2034; }
+.detailgrid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; }
+.metric { background: #081827; border: 1px solid var(--line); padding: 13px; border-radius: 13px; }
+.metric .val { font-size: 19px; font-weight: 750; margin-top: 5px; }
+.timer { font-size: 35px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: 1px; }
+
+.actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.formgrid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 13px; }
+.field.full { grid-column: 1 / -1; }
+
+.flights { display: grid; gap: 10px; }
+.flight { padding: 15px; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.route { font-weight: 800; font-size: 16px; }
+
+.docrow { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.docrow:last-child { border-bottom: 0; }
+.notice { background: #0b2a42; border: 1px solid #205478; color: #c5e7ff; border-radius: 12px; padding: 12px; font-size: 12px; margin-bottom: 15px; }
+
+.bottomnav { display: none; }
+.modalback { position: fixed; inset: 0; background: #020914cc; display: none; align-items: center; justify-content: center; padding: 16px; z-index: 9999; overflow: auto; }
+.modalback.open { display: flex; }
+.modal { width: min(680px, 100%); max-height: 92vh; overflow: auto; background: #0c1e30; border: 1px solid #2a4b67; border-radius: 20px; padding: 20px; box-shadow: 0 30px 100px #0009; }
+.modalhead { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.modalhead h2 { margin: 0; }
+.x { background: #19354c; color: white; padding: 6px 11px; }
+.foot { margin-top: 28px; color: #718ba4; font-size: 11px; text-align: center; }
+
+#mapContainer { width: 100%; height: 520px; border-radius: 16px; overflow: hidden; border: 1px solid var(--line); box-shadow: 0 10px 30px rgba(0,0,0,0.4); }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: #0d2034 !important; color: #eef6ff !important; border: 1px solid #2a4b67 !important; border-radius: 12px !important; }
+.leaflet-container { font-family: inherit !important; background: #06101c !important; }
+.tiles-dark { filter: invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9); }
+.map-popup-title { font-size: 15px; font-weight: 800; color: #39a2ff; margin-bottom: 4px; }
+.map-popup-sub { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+.map-popup-actions { display: flex; gap: 6px; margin-top: 10px; }
+
+@media(max-width:760px) {
+  .app { padding: 16px 13px 95px; }
+  .stats { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; }
+  .stat { padding: 13px; }
+  .stat strong { font-size: 21px; }
+  .fleet { grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; }
+  .planeimg { height: 105px; }
+  .airbody { padding: 11px; }
+  .airtitle h3 { font-size: 14px; }
+  .specs { gap: 8px; font-size: 11px; }
+  .detailgrid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .detailphoto { height: 175px; }
+  .timer { font-size: 29px; }
+  .formgrid { grid-template-columns: 1fr; }
+  .field.full { grid-column: auto; }
+  .top .pill { display: none; }
+  .bottomnav { position: fixed; bottom: 0; left: 0; right: 0; background: #081827f5; border-top: 1px solid var(--line); display: flex; justify-content: space-around; padding: 9px 6px calc(9px + env(safe-area-inset-bottom)); z-index: 5; }
+  .bottomnav button { background: transparent; color: var(--muted); padding: 7px; font-size: 10px; }
+  .bottomnav button.active { color: #68bdff; }
+  .sectionhead { margin-top: 15px; }
+  .flight { align-items: flex-start; }
+  .searchrow input { max-width: none; }
+  #mapContainer { height: 380px; }
+}
+@media(max-width:380px) { .fleet { grid-template-columns: 1fr; } .planeimg { height: 145px; } }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <div class="logo">✈</div>
+      <div>
+        <h1>MyFleet</h1>
+        <div class="muted" style="font-size:12px">Flight Simulator · Flotte & Carte Interactive</div>
+      </div>
+    </div>
+    <span class="pill">MSFS 2020 · MODE COMPLET</span>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-view="fleet">✈ Ma flotte</button>
+    <button class="tab" data-view="map">🗺️ Carte des vols</button>
+    <button class="tab" data-view="flights">◷ Carnet de vols</button>
+    <button class="tab" data-view="docs">▤ Documents</button>
+    <button class="tab" data-view="settings">⚙ Réglages</button>
+  </nav>
+
+  <!-- FLOTTE -->
+  <section id="view-fleet" class="view active">
+    <div class="stats">
+      <div class="stat"><span>AVIONS EN FLOTTE</span><strong id="statAircraft">0</strong></div>
+      <div class="stat"><span>HEURES DE VOL</span><strong id="statHours">0 h</strong></div>
+      <div class="stat"><span>VOLS ENREGISTRÉS</span><strong id="statFlights">0</strong></div>
+      <div class="stat"><span>DOCUMENTS</span><strong id="statDocs">0</strong></div>
+    </div>
+    <div class="sectionhead">
+      <div><h2>Ma flotte</h2><div class="muted tiny">Gestion de vos appareils virtuels.</div></div>
+      <button onclick="openAircraftForm()">＋ Ajouter un avion</button>
+    </div>
+    <div class="searchrow">
+      <input id="search" placeholder="Rechercher un avion…" oninput="renderFleet()">
+      <select id="filterStatus" style="max-width:150px" onchange="renderFleet()">
+        <option value="">Tous statuts</option>
+        <option>Prêt</option>
+        <option>En vol</option>
+        <option>Maintenance</option>
+      </select>
+    </div>
+    <div id="fleetList" class="fleet"></div>
+  </section>
+
+  <!-- FICHE DETAIL AVION -->
+  <section id="view-detail" class="view">
+    <button class="secondary" onclick="navigate('fleet')">← Retour à la flotte</button>
+    <div id="detailContent" style="margin-top:14px"></div>
+  </section>
+
+  <!-- CARTE INTERACTIVE -->
+  <section id="view-map" class="view">
+    <div class="sectionhead">
+      <div>
+        <h2>Carte des lignes de vol</h2>
+        <div class="muted tiny">Cliquez sur un vol ou une ligne pour afficher les détails et le modifier.</div>
+      </div>
+      <button onclick="openFlightForm()">＋ Ajouter un vol</button>
+    </div>
+    <div class="panel" style="padding:10px">
+      <div id="mapContainer"></div>
+    </div>
+  </section>
+
+  <!-- CARNET DE VOLS -->
+  <section id="view-flights" class="view">
+    <div class="sectionhead">
+      <div><h2>Carnet de vols</h2><div class="muted tiny">Historique complet de vos sessions de vol.</div></div>
+      <button onclick="openFlightForm()">＋ Ajouter un vol</button>
+    </div>
+    <div class="panel">
+      <div class="formgrid">
+        <div>
+          <label>Filtrer par avion</label>
+          <select id="flightFilter" onchange="renderFlights()"><option value="">Tous les avions</option></select>
+        </div>
+        <div>
+          <label>Durée cumulée</label>
+          <div id="flightTotal" style="font-size:22px;font-weight:800;padding-top:5px">0 h 00</div>
+        </div>
+      </div>
+    </div>
+    <div id="flightList" class="flights"></div>
+  </section>
+
+  <!-- DOCUMENTS -->
+  <section id="view-docs" class="view">
+    <div class="sectionhead">
+      <div><h2>Bibliothèque de documents</h2><div class="muted tiny">Check-lists, manuels et PDF associés.</div></div>
+      <button onclick="openDocForm()">＋ Ajouter</button>
+    </div>
+    <div class="notice">Vos documents PDF sont stockés en toute sécurité dans la base locale IndexedDB de votre navigateur.</div>
+    <div id="docList" class="panel"></div>
+  </section>
+
+  <!-- REGLAGES -->
+  <section id="view-settings" class="view">
+    <div class="sectionhead">
+      <div><h2>Réglages</h2><div class="muted tiny">Cartes, clés API et données.</div></div>
+    </div>
+
+    <div class="panel">
+      <h3>Fournisseur de carte & Clés API</h3>
+      <p class="muted tiny">OpenStreetMap ne demande aucune clé API. Une clé n'est utile que pour Mapbox ou LocationIQ.</p>
+      <form id="mapApiForm" onsubmit="saveMapSettings(event)" class="formgrid">
+        <div>
+          <label>Fournisseur de fonds de carte</label>
+          <select id="mapProvider" onchange="toggleApiTokenField()">
+            <option value="osm">OpenStreetMap sombre (Par défaut - aucune clé)</option>
+            <option value="osm_light">OpenStreetMap clair (aucune clé)</option>
+            <option value="carto">CartoDB Dark (aucune clé)</option>
+            <option value="mapbox">Mapbox (Nécessite Clé API)</option>
+            <option value="locationiq">LocationIQ (Nécessite Clé API)</option>
+            <option value="custom">Serveur de tuiles personnalisé (URL)</option>
+          </select>
+        </div>
+        <div id="apiTokenGroup">
+          <label id="apiTokenLabel">Clé API (Access Token)</label>
+          <input id="mapApiKey" placeholder="pk.eyJ1Ijo..." value="">
+        </div>
+        <div id="customUrlGroup" class="field full" style="display:none">
+          <label>URL du serveur de tuiles personnalisé</label>
+          <input id="mapCustomUrl" placeholder="https://{s}.tile.example.com/{z}/{x}/{y}.png">
+        </div>
+        <div class="field full">
+          <button type="submit">Enregistrer la configuration de la carte</button>
+        </div>
+      </form>
+      <div class="muted tiny" id="airportStatus" style="margin-top:12px"></div>
+      <button type="button" style="margin-top:8px" onclick="loadFullAirportDB(true)">Mettre à jour la base mondiale des aéroports</button>
+    </div>
+
+    <div class="panel">
+      <h3>Sauvegarde & Restauration JSON</h3>
+      <p class="muted tiny">Exporte l'intégralité de vos avions (avec leurs photos), vols et documents PDF.</p>
+      <button onclick="exportData()">⇩ Exporter mes données JSON</button>
+      <div style="height:12px"></div>
+      <label>Restauration à partir d'un fichier JSON</label>
+      <input type="file" accept="application/json,.json" id="importJson">
+      <div style="height:8px"></div>
+      <button class="secondary" onclick="importData()">Importer le fichier</button>
+    </div>
+
+    <div class="panel">
+      <h3>Zone dangereuse</h3>
+      <p class="muted tiny">Supprime définitivement l'ensemble des avions, vols et documents.</p>
+      <button class="danger" onclick="resetData()">Effacer toutes les données</button>
+    </div>
+  </section>
+
+  <div class="foot">MYFLEET · Flight Simulator Management System</div>
+</div>
+
+<nav class="bottomnav">
+  <button class="active" data-view="fleet">✈<br>Flotte</button>
+  <button data-view="map">🗺️<br>Carte</button>
+  <button data-view="flights">◷<br>Vols</button>
+  <button data-view="docs">▤<br>Docs</button>
+  <button data-view="settings">⚙<br>Réglages</button>
+</nav>
+
+<!-- MODAL POPUP -->
+<div id="modalback" class="modalback" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modalhead">
+      <h2 id="modalTitle">Titre</h2>
+      <button class="x" onclick="closeModal()">✕</button>
+    </div>
+    <div id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+const KEY = 'myfleet_v1';
+let db = { aircraft: [], flights: [], docs: [], settings: { mapProvider: 'osm', apiKey: '', customUrl: '' } };
+let selectedId = null, timerInterval = null;
+const running = {};
+let leafletMap = null, mapLayers = [];
+
+// Base embarquée des aéroports OACI courants
+const AIRPORTS = {
+  "LFPG": [49.0097, 2.5479, "Paris-Charles de Gaulle"],
+  "LFPO": [48.7262, 2.3652, "Paris Orly"],
+  "LFLL": [45.7256, 5.0811, "Lyon Saint-Exupéry"],
+  "LFML": [43.4367, 5.2150, "Marseille Provence"],
+  "LFMN": [43.6653, 7.2150, "Nice Côte d'Azur"],
+  "LFBO": [43.6291, 1.3638, "Toulouse Blagnac"],
+  "LFRS": [47.1532, -1.6108, "Nantes Atlantique"],
+  "EGLL": [51.4700, -0.4543, "London Heathrow"],
+  "EGKK": [51.1481, -0.1903, "London Gatwick"],
+  "EHAM": [52.3105, 4.7683, "Amsterdam Schiphol"],
+  "EDDF": [50.0379, 8.5622, "Frankfurt Am Main"],
+  "EDDM": [48.3536, 11.7860, "Munich"],
+  "LEMD": [40.4839, -3.5680, "Madrid Barajas"],
+  "LEBL": [41.2974, 2.0785, "Barcelona El Prat"],
+  "LIRF": [41.8003, 12.2389, "Rome Fiumicino"],
+  "LSGG": [46.2381, 6.1089, "Genève Cointrin"],
+  "LSZH": [47.4582, 8.5554, "Zürich"],
+  "EBBR": [50.9014, 4.4844, "Bruxelles National"],
+  "KJFK": [40.6413, -73.7781, "New York JFK"],
+  "KLAX": [33.9416, -118.4085, "Los Angeles Intl"],
+  "KORD": [41.9742, -87.9073, "Chicago O'Hare"],
+  "KSFO": [37.6213, -122.3790, "San Francisco Intl"],
+  "KMIA": [25.7959, -80.2870, "Miami Intl"],
+  "CYVR": [49.1967, -123.1815, "Vancouver Intl"],
+  "CYYZ": [43.6777, -79.6248, "Toronto Pearson"],
+  "OMDB": [25.2532, 55.3657, "Dubai International"],
+  "OTHH": [25.2731, 51.6081, "Doha Hamad"],
+  "VHHH": [22.3080, 113.9185, "Hong Kong Intl"],
+  "RJTT": [35.5494, 139.7798, "Tokyo Haneda"],
+  "YSSY": [-33.9461, 151.1772, "Sydney Kingsford Smith"],
+  "SBGL": [-22.8099, -43.2505, "Rio de Janeiro Galeão"]
+};
+
+// Aéroports supplémentaires embarqués (ICAO|lat|lng|nom)
+const EXTRA_AIRPORTS = `LFBD|44.8283|-0.7156|Bordeaux Mérignac
+LFBX|45.1981|0.8156|Périgueux Bassillac
+LFMT|43.5762|3.9630|Montpellier Méditerranée
+LFST|48.5383|7.6282|Strasbourg Entzheim
+LFQQ|50.5619|3.0894|Lille Lesquin
+LFRN|48.0695|-1.7348|Rennes Saint-Jacques
+LFRB|48.4479|-4.4185|Brest Bretagne
+LFOB|49.4545|2.1128|Paris-Beauvais
+LFPB|48.9694|2.4414|Paris Le Bourget
+LFPN|48.7519|2.1061|Toussus-le-Noble
+LFPT|49.0967|2.0408|Pontoise Cormeilles
+LFSB|47.5896|7.5299|Bâle-Mulhouse
+LFKJ|41.9236|8.8029|Ajaccio Napoléon Bonaparte
+LFKB|42.5527|9.4837|Bastia Poretta
+LFKF|41.5006|9.0978|Figari Sud-Corse
+LFKC|42.5308|8.7931|Calvi Sainte-Catherine
+LFTH|43.0973|6.1460|Toulon-Hyères
+LFMP|42.7404|2.8707|Perpignan Rivesaltes
+LFMK|43.2160|2.3063|Carcassonne
+LFMU|43.3236|3.3539|Béziers Cap d'Agde
+LFMD|43.5420|6.9535|Cannes-Mandelieu
+LFMH|45.5406|4.2964|Saint-Étienne Bouthéon
+LFLC|45.7867|3.1692|Clermont-Ferrand Auvergne
+LFLS|45.3629|5.3294|Grenoble Alpes-Isère
+LFLB|45.6381|5.8802|Chambéry Savoie
+LFLY|45.7272|4.9444|Lyon-Bron
+LFLP|45.9308|6.1064|Annecy Haute-Savoie
+LFLJ|45.3967|6.6347|Courchevel
+LFHM|45.8206|6.6522|Megève
+LFBZ|43.4684|-1.5233|Biarritz Pays Basque
+LFBP|43.3800|-0.4186|Pau Pyrénées
+LFBT|43.1787|0.0032|Tarbes Lourdes Pyrénées
+LFBI|46.5877|0.3066|Poitiers Biard
+LFBH|46.1792|-1.1953|La Rochelle Île de Ré
+LFBL|45.8628|1.1794|Limoges Bellegarde
+LFBE|44.8253|0.5186|Bergerac Roumanière
+LFBA|44.1747|0.5906|Agen La Garenne
+LFBM|43.9117|-0.5075|Mont-de-Marsan
+LFRO|48.7544|-3.4716|Lannion
+LFRQ|47.9749|-4.1679|Quimper Cornouaille
+LFRK|49.1733|-0.4500|Caen Carpiquet
+LFRH|47.7606|-3.4400|Lorient Lann-Bihoué
+LFRZ|47.3106|-2.1564|Saint-Nazaire Montoir
+LFOH|49.5339|0.0881|Le Havre Octeville
+LFAT|50.5174|1.6206|Le Touquet Côte d'Opale
+LFJR|47.5603|-0.3122|Angers Loire
+LFOT|47.4322|0.7276|Tours Val de Loire
+LFOJ|47.9978|1.7606|Orléans Bricy
+LFSD|47.2689|5.0900|Dijon Longvic
+LFSN|48.6921|6.2306|Nancy Essey
+LFJL|48.9821|6.2513|Metz-Nancy-Lorraine
+LFAQ|49.9715|2.6977|Albert-Picardie
+LFMV|43.9073|4.9018|Avignon Provence
+LFMI|43.5227|4.9239|Istres
+LFMQ|43.2525|5.7879|Le Castellet
+LFMA|43.5063|5.3678|Aix-les-Milles
+LFTW|43.7574|4.4163|Nîmes Garons
+LFCR|44.4079|2.4827|Rodez Aveyron
+LFCK|43.5563|2.2896|Castres Mazamet
+LFSL|45.0397|1.4856|Brive Souillac
+LFOK|48.7733|4.2064|Châlons Vatry
+EGCC|53.3537|-2.2750|Manchester
+EGBB|52.4539|-1.7480|Birmingham
+EGPH|55.9500|-3.3725|Edinburgh
+EGPF|55.8719|-4.4331|Glasgow
+EGGW|51.8747|-0.3683|London Luton
+EGSS|51.8850|0.2350|London Stansted
+EGLC|51.5053|0.0553|London City
+EGGD|51.3827|-2.7191|Bristol
+EGNX|52.8311|-1.3281|East Midlands
+EGNM|53.8659|-1.6606|Leeds Bradford
+EGNT|55.0375|-1.6917|Newcastle
+EGAA|54.6575|-6.2158|Belfast International
+EIDW|53.4213|-6.2701|Dublin
+EICK|51.8413|-8.4911|Cork
+EINN|52.7020|-8.9248|Shannon
+EDDB|52.3667|13.5033|Berlin Brandenburg
+EDDH|53.6304|9.9882|Hamburg
+EDDK|50.8659|7.1427|Cologne Bonn
+EDDL|51.2895|6.7668|Düsseldorf
+EDDS|48.6899|9.2220|Stuttgart
+EDDN|49.4987|11.0669|Nuremberg
+EDDV|52.4611|9.6851|Hannover
+EDDP|51.4324|12.2416|Leipzig/Halle
+EDDW|53.0475|8.7867|Bremen
+LOWW|48.1103|16.5697|Vienne Schwechat
+LOWS|47.7933|13.0043|Salzbourg
+LOWI|47.2602|11.3440|Innsbruck
+LSZA|46.0043|8.9106|Lugano
+LSZB|46.9141|7.4971|Berne Belp
+LSGS|46.2196|7.3268|Sion
+LSZR|47.4850|9.5600|St. Gallen-Altenrhein
+LKPR|50.1008|14.2600|Prague Václav Havel
+LZIB|48.1702|17.2127|Bratislava
+LHBP|47.4369|19.2556|Budapest Ferenc Liszt
+EPWA|52.1657|20.9671|Varsovie Chopin
+EPKK|50.0777|19.7848|Cracovie
+EPGD|54.3776|18.4662|Gdańsk
+LROP|44.5711|26.0850|Bucarest Otopeni
+LBSF|42.6952|23.4062|Sofia
+LGAV|37.9364|23.9445|Athènes Elefthérios-Venizélos
+LGTS|40.5197|22.9709|Thessalonique
+LGIR|35.3397|25.1803|Héraklion
+LGRP|36.4054|28.0862|Rhodes
+LGKR|39.6019|19.9117|Corfou
+LTFM|41.2753|28.7519|Istanbul
+LTFJ|40.8986|29.3092|Istanbul Sabiha Gökçen
+LTAI|36.8987|30.8005|Antalya
+LTBJ|38.2924|27.1570|Izmir Adnan Menderes
+LTAC|40.1281|32.9951|Ankara Esenboğa
+LCLK|34.8751|33.6249|Larnaca
+LMML|35.8575|14.4775|Malte
+LIMC|45.6306|8.7281|Milan Malpensa
+LIML|45.4451|9.2767|Milan Linate
+LIPZ|45.5053|12.3519|Venise Marco Polo
+LIRN|40.8860|14.2908|Naples
+LICC|37.4668|15.0664|Catane
+LICJ|38.1760|13.0910|Palerme
+LIBD|41.1389|16.7606|Bari
+LIPE|44.5354|11.2887|Bologne
+LIRP|43.6839|10.3927|Pise
+LIRQ|43.8100|11.2051|Florence
+LIMF|45.2008|7.6497|Turin
+LIEE|39.2515|9.0543|Cagliari
+LEPA|39.5517|2.7388|Palma de Majorque
+LEMG|36.6749|-4.4991|Málaga
+LEAL|38.2822|-0.5582|Alicante
+LEVC|39.4893|-0.4816|Valence
+LEZL|37.4180|-5.8931|Séville
+LEBB|43.3011|-2.9106|Bilbao
+LEIB|38.8729|1.3731|Ibiza
+LPPT|38.7813|-9.1359|Lisbonne
+LPPR|41.2481|-8.6814|Porto
+LPFR|37.0144|-7.9659|Faro
+LPFU|32.6979|-16.7745|Funchal Madère
+LPPD|37.7412|-25.6979|Ponta Delgada Açores
+GCLP|27.9319|-15.3866|Gran Canaria
+GCTS|28.0445|-16.5725|Tenerife Sud
+GCRR|28.9455|-13.6052|Lanzarote
+EKCH|55.6180|12.6560|Copenhague
+ESSA|59.6519|17.9186|Stockholm Arlanda
+ESGG|57.6628|12.2798|Göteborg Landvetter
+ENGM|60.1939|11.1004|Oslo Gardermoen
+ENBR|60.2934|5.2181|Bergen Flesland
+EFHK|60.3172|24.9633|Helsinki Vantaa
+BIKF|63.9850|-22.6056|Reykjavik Keflavík
+EVRA|56.9236|23.9711|Riga
+EETN|59.4133|24.8328|Tallinn
+EYVI|54.6341|25.2858|Vilnius
+UUEE|55.9726|37.4146|Moscou Cheremetievo
+ULLI|59.8003|30.2625|Saint-Pétersbourg Pulkovo
+UKBB|50.3450|30.8947|Kiev Boryspil
+LYBE|44.8184|20.3091|Belgrade Nikola Tesla
+LDZA|45.7429|16.0688|Zagreb
+LDSP|43.5389|16.2980|Split
+LDDU|42.5614|18.2682|Dubrovnik
+LJLJ|46.2237|14.4576|Ljubljana
+EHRD|51.9569|4.4372|Rotterdam La Haye
+EHEH|51.4501|5.3747|Eindhoven
+EBCI|50.4592|4.4538|Charleroi
+ELLX|49.6233|6.2044|Luxembourg
+EBLG|50.6374|5.4432|Liège
+EBOS|51.1989|2.8622|Ostende
+EBAW|51.1894|4.4603|Anvers
+OMAA|24.4330|54.6511|Abu Dhabi Zayed
+OMSJ|25.3286|55.5172|Sharjah
+OMDW|24.8963|55.1614|Dubai Al Maktoum
+OEJN|21.6796|39.1565|Djeddah King Abdulaziz
+OERK|24.9576|46.6988|Riyad King Khalid
+OEDF|26.4712|49.7979|Dammam King Fahd
+OTBD|25.2611|51.5651|Doha International
+OBBI|26.2708|50.6336|Bahreïn
+OKBK|29.2266|47.9689|Koweït
+OOMS|23.5933|58.2844|Mascate
+OJAI|31.7226|35.9932|Amman Reine Alia
+OLBA|33.8209|35.4884|Beyrouth Rafic Hariri
+LLBG|32.0114|34.8867|Tel Aviv Ben Gourion
+OIIE|35.4161|51.1522|Téhéran Imam Khomeini
+ORBI|33.2625|44.2346|Bagdad
+HECA|30.1219|31.4056|Le Caire
+HESH|27.9773|34.3948|Charm el-Cheikh
+HEGN|27.1783|33.7994|Hurghada
+GMMN|33.3675|-7.5899|Casablanca Mohammed V
+GMMX|31.6069|-8.0363|Marrakech Ménara
+DTTA|36.8510|10.2272|Tunis Carthage
+DAAG|36.6910|3.2154|Alger Houari Boumédiène
+DGAA|5.6052|-0.1668|Accra Kotoka
+DNMM|6.5774|3.3212|Lagos Murtala Muhammed
+HKJK|-1.3192|36.9278|Nairobi Jomo Kenyatta
+HAAB|8.9779|38.7993|Addis-Abeba Bole
+FAOR|-26.1392|28.2460|Johannesburg OR Tambo
+FACT|-33.9649|18.6017|Le Cap
+FALE|-29.6144|31.1197|Durban King Shaka
+FIMP|-20.4302|57.6836|Maurice Sir Seewoosagur Ramgoolam
+FMEE|-20.8871|55.5103|La Réunion Roland Garros
+GOBD|14.6700|-17.0733|Dakar Blaise Diagne
+GOOY|14.7397|-17.4902|Dakar Léopold Sédar Senghor
+FZAA|-4.3858|15.4446|Kinshasa N'djili
+HTDA|-6.8781|39.2026|Dar es Salaam
+FNLU|-8.8584|13.2312|Luanda
+DIAP|5.2614|-3.9263|Abidjan Félix Houphouët-Boigny
+FMMI|-18.7969|47.4788|Antananarivo Ivato
+VIDP|28.5562|77.1000|Delhi Indira Gandhi
+VABB|19.0887|72.8679|Mumbai
+VOBL|13.1979|77.7063|Bengaluru
+VOMM|12.9900|80.1693|Chennai
+VECC|22.6547|88.4467|Calcutta
+VTBS|13.6900|100.7501|Bangkok Suvarnabhumi
+VTBD|13.9126|100.6067|Bangkok Don Mueang
+VTSP|8.1132|98.3169|Phuket
+WSSS|1.3644|103.9915|Singapour Changi
+WMKK|2.7456|101.7099|Kuala Lumpur
+WIII|-6.1256|106.6559|Jakarta Soekarno-Hatta
+WADD|-8.7482|115.1672|Bali Ngurah Rai
+RPLL|14.5086|121.0194|Manille Ninoy Aquino
+VVTS|10.8188|106.6520|Hô Chi Minh-Ville Tân Sơn Nhất
+VVNB|21.2212|105.8072|Hanoï Nội Bài
+ZBAA|40.0799|116.5844|Pékin Capital
+ZBAD|39.5098|116.4105|Pékin Daxing
+ZSPD|31.1434|121.8052|Shanghai Pudong
+ZSSS|31.1979|121.3363|Shanghai Hongqiao
+ZGGG|23.3924|113.2988|Canton Baiyun
+ZGSZ|22.6393|113.8107|Shenzhen Bao'an
+ZUUU|30.5785|103.9471|Chengdu Shuangliu
+RKSI|37.4602|126.4407|Séoul Incheon
+RKSS|37.5583|126.7906|Séoul Gimpo
+RJAA|35.7647|140.3864|Tokyo Narita
+RJBB|34.4273|135.2440|Osaka Kansai
+RJOO|34.7855|135.4380|Osaka Itami
+RJGG|34.8584|136.8054|Nagoya Chubu
+RJFF|33.5859|130.4507|Fukuoka
+RCTP|25.0777|121.2328|Taipei Taoyuan
+VMMC|22.1496|113.5915|Macao
+VCBI|7.1808|79.8841|Colombo Bandaranaike
+VNKT|27.6966|85.3591|Katmandou
+OPKC|24.9065|67.1608|Karachi Jinnah
+OPLA|31.5216|74.4036|Lahore Allama Iqbal
+VGHS|23.8433|90.3978|Dhaka Hazrat Shahjalal
+UAAA|43.3521|77.0405|Almaty
+UTTT|41.2579|69.2812|Tachkent
+UBBB|40.4675|50.0467|Bakou Heydar Aliyev
+UGTB|41.6692|44.9547|Tbilissi
+UDYZ|40.1473|44.3959|Erevan Zvartnots
+VRMM|4.1918|73.5291|Malé Velana
+YMML|-37.6690|144.8410|Melbourne Tullamarine
+YBBN|-27.3842|153.1175|Brisbane
+YPPH|-31.9403|115.9669|Perth
+YPAD|-34.9450|138.5306|Adélaïde
+NZAA|-37.0082|174.7917|Auckland
+NZWN|-41.3272|174.8053|Wellington
+NZCH|-43.4894|172.5320|Christchurch
+NFFN|-17.7554|177.4431|Nadi Fidji
+NTAA|-17.5537|-149.6070|Tahiti Faa'a
+NWWW|-22.0146|166.2130|Nouméa La Tontouta
+KATL|33.6407|-84.4277|Atlanta Hartsfield-Jackson
+KDFW|32.8998|-97.0403|Dallas/Fort Worth
+KDEN|39.8561|-104.6737|Denver
+KLAS|36.0840|-115.1537|Las Vegas Harry Reid
+KSEA|47.4502|-122.3088|Seattle-Tacoma
+KBOS|42.3656|-71.0096|Boston Logan
+KEWR|40.6895|-74.1745|Newark Liberty
+KLGA|40.7769|-73.8740|New York LaGuardia
+KIAD|38.9531|-77.4565|Washington Dulles
+KDCA|38.8521|-77.0377|Washington Reagan
+KPHL|39.8744|-75.2424|Philadelphie
+KMCO|28.4294|-81.3089|Orlando
+KFLL|26.0726|-80.1527|Fort Lauderdale
+KTPA|27.9755|-82.5332|Tampa
+KIAH|29.9844|-95.3414|Houston George Bush
+KPHX|33.4343|-112.0116|Phoenix Sky Harbor
+KMSP|44.8820|-93.2218|Minneapolis-Saint Paul
+KDTW|42.2124|-83.3534|Détroit Metro
+KCLT|35.2140|-80.9431|Charlotte Douglas
+KSAN|32.7336|-117.1897|San Diego
+KSLC|40.7884|-111.9778|Salt Lake City
+KPDX|45.5887|-122.5975|Portland
+KBWI|39.1754|-76.6683|Baltimore/Washington
+KMDW|41.7868|-87.7522|Chicago Midway
+PHNL|21.3187|-157.9224|Honolulu
+PANC|61.1744|-149.9964|Anchorage
+CYUL|45.4706|-73.7408|Montréal-Trudeau
+CYYC|51.1139|-114.0200|Calgary
+CYEG|53.3097|-113.5800|Edmonton
+CYOW|45.3225|-75.6692|Ottawa
+CYHZ|44.8808|-63.5086|Halifax Stanfield
+CYQB|46.7911|-71.3933|Québec Jean-Lesage
+MMMX|19.4363|-99.0721|Mexico Benito Juárez
+MMUN|21.0365|-86.8771|Cancún
+MPTO|9.0714|-79.3835|Panama Tocumen
+MROC|9.9939|-84.2088|San José Juan Santamaría
+SKBO|4.7016|-74.1469|Bogotá El Dorado
+SPJC|-12.0219|-77.1143|Lima Jorge Chávez
+SCEL|-33.3930|-70.7858|Santiago Arturo Merino Benítez
+SAEZ|-34.8222|-58.5358|Buenos Aires Ezeiza
+SABE|-34.5592|-58.4156|Buenos Aires Aeroparque
+SBGR|-23.4356|-46.4731|São Paulo Guarulhos
+SBSP|-23.6261|-46.6564|São Paulo Congonhas
+SBBR|-15.8711|-47.9186|Brasília
+SEQM|-0.1292|-78.3575|Quito Mariscal Sucre
+SUMU|-34.8384|-56.0308|Montevideo Carrasco
+TFFR|16.2653|-61.5272|Pointe-à-Pitre Le Raizet
+TFFF|14.5910|-61.0032|Fort-de-France Aimé Césaire
+SOCA|4.8198|-52.3604|Cayenne Félix Eboué
+MKJP|17.9357|-76.7875|Kingston Norman Manley
+MYNN|25.0390|-77.4662|Nassau Lynden Pindling
+TNCM|18.0410|-63.1089|Saint-Martin Princess Juliana
+TFFJ|17.9044|-62.8436|Saint-Barthélemy Gustaf III
+LFVP|46.7629|-56.1731|Saint-Pierre Pointe-Blanche`;
+EXTRA_AIRPORTS.split('\n').forEach(line => {
+  const p = line.split('|');
+  if (p.length === 4 && !AIRPORTS[p[0]]) AIRPORTS[p[0]] = [parseFloat(p[1]), parseFloat(p[2]), p[3]];
+});
+
+// Recherche / résolution d'aéroports par code OACI
+function getCoords(icao) {
+  if (!icao) return null;
+  const code = icao.trim().toUpperCase();
+  if (AIRPORTS[code]) {
+    return { lat: AIRPORTS[code][0], lng: AIRPORTS[code][1], name: AIRPORTS[code][2], code };
+  }
+  return null; // code inconnu : pas de position inventée
+}
+
+// Base complète OurAirports (tous les aéroports du monde avec code OACI), mise en cache dans IndexedDB
+const AIRPORT_CSV_URL = 'https://davidmegginson.github.io/ourairports-data/airports.csv';
+const AIRPORT_DB_KEY = 'airports_db_v1';
+
+function parseCSV(text) {
+  const rows = []; let row = [], field = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i];
+    if (q) {
+      if (c === '"') { if (text[i+1] === '"') { field += '"'; i++; } else q = false; }
+      else field += c;
+    } else if (c === '"') q = true;
+    else if (c === ',') { row.push(field); field = ''; }
+    else if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; }
+    else if (c !== '\r') field += c;
+  }
+  if (field || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+function mergeAirportList(list) {
+  let n = 0;
+  for (const [code, lat, lng, name] of list) {
+    if (!AIRPORTS[code]) { AIRPORTS[code] = [lat, lng, name]; n++; }
+  }
+  return n;
+}
+
+function setAirportStatus(msg) {
+  const el = document.getElementById('airportStatus');
+  if (el) el.textContent = msg;
+}
+
+async function loadFullAirportDB(force = false) {
+  try {
+    let cached = null;
+    if (!force) { try { cached = await getFile(AIRPORT_DB_KEY); } catch (e) {} }
+    if (cached && cached.list && cached.list.length) {
+      mergeAirportList(cached.list);
+      setAirportStatus(`Base d'aéroports : ${Object.keys(AIRPORTS).length} codes OACI chargés (cache du ${new Date(cached.ts).toLocaleDateString('fr-FR')}).`);
+      refreshAfterAirports();
+      if (Date.now() - cached.ts < 90 * 86400000) return;
+    }
+    setAirportStatus('Téléchargement de la base mondiale des aéroports…');
+    const res = await fetch(AIRPORT_CSV_URL);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const rows = parseCSV(await res.text());
+    const h = rows[0]; const ix = n => h.indexOf(n);
+    const iId = ix('ident'), iType = ix('type'), iName = ix('name'), iLat = ix('latitude_deg'), iLng = ix('longitude_deg'), iIcao = ix('icao_code');
+    const ok = new Set(['large_airport', 'medium_airport', 'small_airport']);
+    const list = [];
+    for (let i = 1; i < rows.length; i++) {
+      const r = rows[i];
+      if (!r || r.length < h.length - 2 || !ok.has(r[iType])) continue;
+      const code = ((r[iIcao] || r[iId]) + '').toUpperCase();
+      if (!/^[A-Z]{4}$/.test(code)) continue;
+      const lat = parseFloat(r[iLat]), lng = parseFloat(r[iLng]);
+      if (isNaN(lat) || isNaN(lng)) continue;
+      list.push([code, lat, lng, r[iName]]);
+    }
+    await putFile(AIRPORT_DB_KEY, { ts: Date.now(), list });
+    mergeAirportList(list);
+    setAirportStatus(`Base d'aéroports : ${Object.keys(AIRPORTS).length} codes OACI chargés.`);
+    refreshAfterAirports();
+  } catch (e) {
+    console.warn('Base aéroports', e);
+    setAirportStatus(`Base intégrée uniquement (${Object.keys(AIRPORTS).length} aéroports). Téléchargement complet impossible (connexion ?).`);
+  }
+}
+
+function refreshAfterAirports() {
+  try { renderFlights(); } catch (e) {}
+  if (leafletMap && document.getElementById('view-map').classList.contains('active')) initOrUpdateMap();
+}
+
+// Essai de résolution pour un aéroport encore inconnu
+async function fetchAirportNameInfo(code) {
+  if (!code) return;
+  const c = code.trim().toUpperCase();
+  if (AIRPORTS[c]) return;
+  try {
+    const res = await fetch(`https://api.airportsapi.com/v1/airports/${c}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data && data.name) {
+        AIRPORTS[c] = [parseFloat(data.latitude), parseFloat(data.longitude), data.name];
+        refreshAfterAirports();
+      }
+    }
+  } catch(e) {}
+}
+
+// IndexedDB pour les fichiers lourds (Photos + PDF)
+const FILE_DB = 'myfleet_files_v2', FILE_STORE = 'files';
+function openFileDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(FILE_DB, 1);
+    req.onupgradeneeded = () => { if (!req.result.objectStoreNames.contains(FILE_STORE)) req.result.createObjectStore(FILE_STORE); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function putFile(key, value) {
+  const idb = await openFileDB();
+  return new Promise((resolve, reject) => {
+    const tx = idb.transaction(FILE_STORE, 'readwrite');
+    tx.objectStore(FILE_STORE).put(value, key);
+    tx.oncomplete = () => { idb.close(); resolve(); };
+    tx.onerror = () => { idb.close(); reject(tx.error); };
+  });
+}
+async function getFile(key) {
+  const idb = await openFileDB();
+  return new Promise((resolve, reject) => {
+    const tx = idb.transaction(FILE_STORE, 'readonly');
+    const req = tx.objectStore(FILE_STORE).get(key);
+    req.onsuccess = () => { idb.close(); resolve(req.result || ''); };
+    req.onerror = () => { idb.close(); reject(req.error); };
+  });
+}
+
+// Chargement & Sauvegarde
+async function load() {
+  try {
+    const x = JSON.parse(localStorage.getItem(KEY));
+    if (x && Array.isArray(x.aircraft)) {
+      db = { ...db, ...x };
+      for (const a of db.aircraft) { if (a.photoKey && !a.photo) a.photo = await getFile(a.photoKey); }
+      for (const d of db.docs) { if (d.fileKey && !d.data) d.data = await getFile(d.fileKey); }
+    }
+  } catch(e) { console.warn('Erreur chargement local', e); }
+  
+  populateMapSettingsForm();
+  renderAll();
+  loadFullAirportDB();
+}
+
+async function save() {
+  try {
+    for (const a of db.aircraft) {
+      if (a.photo) {
+        a.photoKey = a.photoKey || ('photo_' + a.id);
+        await putFile(a.photoKey, a.photo);
+      }
+    }
+    for (const d of db.docs) {
+      if (d.data) {
+        d.fileKey = d.fileKey || d.id;
+        await putFile(d.fileKey, d.data);
+      }
+    }
+    const meta = {
+      ...db,
+      aircraft: db.aircraft.map(a => { const x = { ...a }; delete x.photo; return x; }),
+      docs: db.docs.map(d => { const x = { ...d }; delete x.data; return x; })
+    };
+    localStorage.setItem(KEY, JSON.stringify(meta));
+    renderAll();
+  } catch(e) { alert('Sauvegarde locale impossible.'); console.error(e); }
+}
+
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function esc(s='') { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmt(sec) { sec = Math.max(0, Math.floor(sec||0)); return [Math.floor(sec/3600), Math.floor(sec%3600/60), sec%60].map(n => String(n).padStart(2,'0')).join(':'); }
+function pretty(sec) { sec = Math.round((sec||0)/60); return `${Math.floor(sec/60)} h ${String(sec%60).padStart(2,'0')}`; }
+function totalSec(id) { return db.flights.filter(f => !id || f.aircraftId === id).reduce((a, f) => a + (+f.seconds||0), 0); }
+
+function navigate(view) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  const el = document.getElementById('view-' + view);
+  if (el) el.classList.add('active');
+  document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  
+  if (view === 'flights') renderFlights();
+  if (view === 'docs') renderDocs();
+  if (view === 'map') initOrUpdateMap();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => navigate(b.dataset.view)));
+
+function renderAll() {
+  document.getElementById('statAircraft').textContent = db.aircraft.length;
+  document.getElementById('statHours').textContent = pretty(totalSec());
+  document.getElementById('statFlights').textContent = db.flights.length;
+  document.getElementById('statDocs').textContent = db.docs.length;
+  renderFleet();
+  renderFlights();
+  renderDocs();
+  if (document.getElementById('view-map').classList.contains('active')) initOrUpdateMap();
+}
+
+// Rendu de la flotte
+function renderFleet() {
+  const q = (document.getElementById('search')?.value || '').toLowerCase();
+  const status = document.getElementById('filterStatus')?.value || '';
+  let list = db.aircraft.filter(a => (a.name + ' ' + a.manufacturer + ' ' + a.registration).toLowerCase().includes(q) && (!status || a.status === status));
+  const root = document.getElementById('fleetList');
+  if (!list.length) {
+    root.innerHTML = `<div class="empty" style="grid-column:1/-1"><div style="font-size:34px;margin-bottom:8px">✈</div><h3>${db.aircraft.length ? 'Aucun résultat' : 'Votre flotte est vide'}</h3><p class="tiny">Ajoutez votre premier appareil pour débuter.</p><button onclick="openAircraftForm()">＋ Ajouter un avion</button></div>`;
+    return;
+  }
+  root.innerHTML = list.map(a => `<article class="aircraft" onclick="showAircraft('${a.id}')"><div class="planeimg">${a.photo ? `<img src="${esc(a.photo)}" alt="${esc(a.name)}">` : `<div class="planeemoji">${esc(a.emoji||'✈️')}</div>`}<span class="status" style="${a.status==='En vol'?'background:#33280d;color:var(--orange)':a.status==='Maintenance'?'background:#351d28;color:#ff9aa7':''}">${esc(a.status||'Prêt')}</span></div><div class="airbody"><div class="airtitle"><h3>${esc(a.name)}</h3><span class="tiny">›</span></div><div class="muted tiny">${esc(a.manufacturer||'Avion personnel')}${a.registration ? ' · ' + esc(a.registration) : ''}</div><div class="specs"><span>◷ <b>${pretty(totalSec(a.id))}</b></span>${a.range ? `<span>↗ <b>${Number(a.range).toLocaleString('fr-FR')} km</b></span>` : ''}${a.passengers ? `<span>♙ <b>${esc(a.passengers)} pax</b></span>` : ''}</div></div></article>`).join('');
+}
+
+function openModal(title, html) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').innerHTML = html;
+  document.getElementById('modalback').classList.add('open');
+}
+function closeModal() { document.getElementById('modalback').classList.remove('open'); }
+
+// Formulaire Avion (Ajout & Edition sécurisée avec photo)
+function openAircraftForm(id) {
+  const a = db.aircraft.find(x => x.id === id) || {};
+  openModal(id ? 'Modifier l’avion' : 'Ajouter un avion', `
+    <form id="airForm" class="formgrid">
+      <input type="hidden" name="id" value="${esc(a.id||'')}">
+      <div class="field full">
+        <label>Nom de l’avion *</label>
+        <input name="name" required placeholder="Ex. Boeing 737-800" value="${esc(a.name||'')}">
+      </div>
+      <div>
+        <label>Constructeur</label>
+        <input name="manufacturer" placeholder="Boeing, Airbus…" value="${esc(a.manufacturer||'')}">
+      </div>
+      <div>
+        <label>Immatriculation / Surnom</label>
+        <input name="registration" placeholder="F-GABC" value="${esc(a.registration||'')}">
+      </div>
+      <div>
+        <label>Distance max (km)</label>
+        <input name="range" type="number" min="0" placeholder="5600" value="${esc(a.range||'')}">
+      </div>
+      <div>
+        <label>Passagers</label>
+        <input name="passengers" type="number" min="0" placeholder="189" value="${esc(a.passengers||'')}">
+      </div>
+      <div>
+        <label>Vitesse croisière (kt)</label>
+        <input name="speed" type="number" min="0" value="${esc(a.speed||'')}">
+      </div>
+      <div>
+        <label>Altitude max (ft)</label>
+        <input name="altitude" type="number" min="0" value="${esc(a.altitude||'')}">
+      </div>
+      <div>
+        <label>Statut</label>
+        <select name="status">${['Prêt','En vol','Maintenance'].map(s => `<option ${a.status===s?'selected':''}>${s}</option>`).join('')}</select>
+      </div>
+      <div>
+        <label>Emoji de remplacement</label>
+        <select name="emoji">${['✈️','🛩️','🚁','🛫'].map(s => `<option ${a.emoji===s?'selected':''}>${s}</option>`).join('')}</select>
+      </div>
+      <div class="field full">
+        <label>Photo de l'avion</label>
+        ${a.photo ? `<div style="margin-bottom:8px;display:flex;align-items:center;gap:10px"><img src="${esc(a.photo)}" style="height:50px;border-radius:8px;object-fit:cover"><label style="margin:0"><input type="checkbox" name="removePhoto"> Supprimer la photo actuelle</label></div>` : ''}
+        <input name="photoFile" type="file" accept="image/*">
+        <div class="tiny">Sélectionnez une nouvelle image pour remplacer la photo existante.</div>
+      </div>
+      <div class="field full">
+        <label>Histoire / Notes</label>
+        <textarea name="history" rows="3" placeholder="Notes sur cet appareil…">${esc(a.history||'')}</textarea>
+      </div>
+      <div class="field full">
+        <button type="submit" style="width:100%">Enregistrer l’avion</button>
+      </div>
+    </form>
+  `);
+
+  document.getElementById('airForm').onsubmit = async e => {
+    e.preventDefault();
+    const f = e.currentTarget, d = Object.fromEntries(new FormData(f).entries()), file = f.elements.photoFile.files[0];
+    let photo = a.photo || '';
+    let photoKey = a.photoKey || '';
+    
+    if (d.removePhoto) {
+      photo = '';
+      photoKey = '';
+    }
+
+    if (file) {
+      photo = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.onerror = reject;
+        r.readAsDataURL(file);
+      });
+      photoKey = 'photo_' + (d.id || uid());
+      await putFile(photoKey, photo);
+    }
+
+    let item = {
+      ...a, ...d,
+      id: d.id || uid(),
+      range: +d.range || 0,
+      passengers: +d.passengers || 0,
+      speed: +d.speed || 0,
+      altitude: +d.altitude || 0,
+      photo, photoKey,
+      created: a.created || Date.now()
+    };
+    delete item.photoFile;
+    delete item.removePhoto;
+
+    const i = db.aircraft.findIndex(x => x.id === item.id);
+    if (i >= 0) db.aircraft[i] = item; else db.aircraft.unshift(item);
+    
+    await save();
+    closeModal();
+    if (selectedId === item.id) showAircraft(item.id);
+  };
+}
+
+// Vue Détaillée d'un avion
+function showAircraft(id) {
+  selectedId = id;
+  const a = db.aircraft.find(x => x.id === id);
+  if (!a) return;
+  
+  const flights = db.flights.filter(f => f.aircraftId === id).sort((x, y) => (y.date||'').localeCompare(x.date||''));
+  const docs = db.docs.filter(d => d.aircraftId === id);
+
+  document.getElementById('detailContent').innerHTML = `
+    <div class="detailhero">
+      <div class="detailphoto">${a.photo ? `<img src="${esc(a.photo)}" alt="${esc(a.name)}">` : `<span>${esc(a.emoji||'✈️')}</span>`}</div>
+      <div class="detailinfo">
+        <div class="sectionhead" style="margin:0">
+          <div>
+            <h1>${esc(a.name)}</h1>
+            <div class="muted">${esc(a.manufacturer||'Avion personnel')} ${a.registration ? '· ' + esc(a.registration) : ''}</div>
+          </div>
+          <span class="pill">${esc(a.status||'Prêt')}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="actions" style="margin-top:0">
+        <button onclick="openAircraftForm('${a.id}')">✎ Modifier l'avion</button>
+        <button class="secondary" onclick="openFlightForm('', 0, '${a.id}')">＋ Enregistrer un vol</button>
+        <button class="danger" onclick="deleteAircraft('${a.id}')">Supprimer</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="sectionhead" style="margin-top:0">
+        <div><h2>Minuteur de vol</h2><div class="tiny">Chronométrez votre session de vol.</div></div>
+        <span class="pill">${running[id] ? 'EN COURS' : 'PRÊT'}</span>
+      </div>
+      <div class="timer" id="timer-${id}">${fmt(running[id]?.elapsed || 0)}</div>
+      <div class="actions">
+        ${running[id] ? `<button onclick="stopTimer('${id}')">■ Arrêter et enregistrer</button><button class="secondary" onclick="pauseTimer('${id}')">Ⅱ Pause</button>` : `<button onclick="startTimer('${id}')">▶ Démarrer le vol</button>`}
+        <button class="secondary" onclick="openFlightForm('', running[''+id]?.elapsed||0, '${id}')">Ajouter manuellement</button>
+      </div>
+    </div>
+
+    <div class="detailgrid">
+      <div class="metric"><div class="tiny">Distance max</div><div class="val">${a.range ? Number(a.range).toLocaleString('fr-FR') + ' km' : '—'}</div></div>
+      <div class="metric"><div class="tiny">Passagers</div><div class="val">${a.passengers || '—'}</div></div>
+      <div class="metric"><div class="tiny">Heures cumulées</div><div class="val">${pretty(totalSec(id))}</div></div>
+      <div class="metric"><div class="tiny">Vitesse croisière</div><div class="val">${a.speed ? a.speed + ' kt' : '—'}</div></div>
+      <div class="metric"><div class="tiny">Altitude max</div><div class="val">${a.altitude ? Number(a.altitude).toLocaleString('fr-FR') + ' ft' : '—'}</div></div>
+      <div class="metric"><div class="tiny">Vols enregistrés</div><div class="val">${flights.length}</div></div>
+    </div>
+
+    <div class="panel" style="margin-top:14px">
+      <h2>À propos de l’appareil</h2>
+      <p class="muted">${esc(a.history || 'Aucune note disponible.')}</p>
+    </div>
+
+    <div class="panel">
+      <div class="sectionhead" style="margin-top:0">
+        <h2>Documents (${docs.length})</h2>
+        <button class="secondary" onclick="openDocForm('${a.id}')">＋ Ajouter</button>
+      </div>
+      ${docs.length ? docs.map(docRow).join('') : '<p class="muted tiny">Aucun document pour cet avion.</p>'}
+    </div>
+
+    <div class="panel">
+      <div class="sectionhead" style="margin-top:0">
+        <h2>Derniers vols</h2>
+        <button class="secondary" onclick="navigate('flights')">Tout voir</button>
+      </div>
+      ${flights.slice(0, 4).map(flightRow).join('') || '<p class="muted tiny">Aucun vol enregistré.</p>'}
+    </div>
+  `;
+  
+  navigate('detail');
+  if (running[id]) startTick(id);
+}
+
+function deleteAircraft(id) {
+  if (!confirm('Supprimer cet avion ? Ses vols et documents seront également supprimés.')) return;
+  db.aircraft = db.aircraft.filter(a => a.id !== id);
+  db.flights = db.flights.filter(f => f.aircraftId !== id);
+  db.docs = db.docs.filter(d => d.aircraftId !== id);
+  delete running[id];
+  save();
+  navigate('fleet');
+}
+
+// Timer Logic
+function startTimer(id) {
+  if (running[id]) return;
+  running[id] = { start: Date.now(), elapsed: 0, paused: false };
+  const a = db.aircraft.find(a => a.id === id);
+  if (a) a.status = 'En vol';
+  save();
+  showAircraft(id);
+  startTick(id);
+}
+function startTick(id) {
+  if (timerInterval) clearInterval(timerInterval);
+  timerInterval = setInterval(() => {
+    if (!running[id] || running[id].paused) return;
+    const el = document.getElementById('timer-' + id);
+    if (el) el.textContent = fmt((running[id].elapsed || 0) + Math.floor((Date.now() - running[id].start) / 1000));
+  }, 1000);
+}
+function pauseTimer(id) {
+  if (!running[id]) return;
+  const r = running[id];
+  if (!r.paused) {
+    r.elapsed += Math.floor((Date.now() - r.start) / 1000);
+    r.paused = true;
+    if (timerInterval) clearInterval(timerInterval);
+  } else {
+    r.start = Date.now();
+    r.paused = false;
+    startTick(id);
+  }
+  showAircraft(id);
+}
+function stopTimer(id) {
+  if (!running[id]) return;
+  const r = running[id];
+  const seconds = (r.elapsed || 0) + (r.paused ? 0 : Math.floor((Date.now() - r.start) / 1000));
+  delete running[id];
+  const a = db.aircraft.find(a => a.id === id);
+  if (a) a.status = 'Prêt';
+  save();
+  openFlightForm('', seconds, id);
+}
+
+// Formulaire Vol (Ajout & Edition avec Numéro de vol)
+function openFlightForm(flightId='', seconds=0, defaultAircraftId='') {
+  if (!db.aircraft.length) {
+    alert('Veuillez d’abord ajouter un avion à votre flotte.');
+    openAircraftForm();
+    return;
+  }
+  
+  const f = flightId ? db.flights.find(x => x.id === flightId) : null;
+  const targetAircraftId = f ? f.aircraftId : (defaultAircraftId || db.aircraft[0]?.id);
+  const durationSec = f ? f.seconds : seconds;
+  const durationFmt = durationSec ? `${Math.floor(durationSec/3600)}:${String(Math.floor((durationSec%3600)/60)).padStart(2,'0')}` : '1:00';
+  
+  openModal(f ? 'Modifier le vol' : 'Enregistrer un vol', `
+    <form id="flightForm" class="formgrid">
+      <input type="hidden" name="flightId" value="${esc(f?.id || '')}">
+      <div class="field full">
+        <label>Avion *</label>
+        <select name="aircraftId" required>
+          ${db.aircraft.map(a => `<option value="${a.id}" ${a.id===targetAircraftId?'selected':''}>${esc(a.name)} (${esc(a.registration||'Sans immat')})</option>`).join('')}
+        </select>
+      </div>
+      <div>
+        <label>Numéro de vol (ex. AF006)</label>
+        <input name="flightNumber" placeholder="Ex. AF006, DL415" value="${esc(f?.flightNumber||'')}">
+      </div>
+      <div>
+        <label>Date du vol *</label>
+        <input type="date" name="date" value="${f?.date || new Date().toISOString().slice(0,10)}" required>
+      </div>
+      <div>
+        <label>Aéroport de départ (ICAO) *</label>
+        <input name="from" placeholder="Ex. LFPG" value="${esc(f?.from||'')}" required style="text-transform:uppercase">
+      </div>
+      <div>
+        <label>Aéroport d’arrivée (ICAO) *</label>
+        <input name="to" placeholder="Ex. KJFK" value="${esc(f?.to||'')}" required style="text-transform:uppercase">
+      </div>
+      <div>
+        <label>Durée (HH:MM) *</label>
+        <input name="duration" pattern="[0-9]{1,3}:[0-5][0-9]" value="${durationFmt}" required placeholder="1:30">
+      </div>
+      <div class="field full">
+        <label>Notes / Plan de vol (facultatif)</label>
+        <textarea name="notes" rows="2" placeholder="Route, météo, remarques…">${esc(f?.notes||'')}</textarea>
+      </div>
+      <div class="field full">
+        <button type="submit" style="width:100%">${f ? 'Enregistrer les modifications' : 'Ajouter le vol'}</button>
+      </div>
+    </form>
+  `);
+
+  document.getElementById('flightForm').onsubmit = async e => {
+    e.preventDefault();
+    const fd = Object.fromEntries(new FormData(e.currentTarget).entries());
+    const m = fd.duration.match(/^(\d{1,3}):([0-5]\d)$/);
+    if (!m) { alert('Durée attendue au format heures:minutes (ex. 2:45)'); return; }
+    
+    const fromIcao = (fd.from||'').trim().toUpperCase();
+    const toIcao = (fd.to||'').trim().toUpperCase();
+
+    fetchAirportNameInfo(fromIcao);
+    fetchAirportNameInfo(toIcao);
+
+    const computedSec = (+m[1]*60 + +m[2])*60;
+    const flightData = {
+      id: fd.flightId || uid(),
+      aircraftId: fd.aircraftId,
+      flightNumber: (fd.flightNumber||'').trim().toUpperCase(),
+      from: fromIcao,
+      to: toIcao,
+      date: fd.date,
+      duration: fd.duration,
+      seconds: computedSec,
+      notes: fd.notes
+    };
+
+    if (fd.flightId) {
+      const idx = db.flights.findIndex(x => x.id === fd.flightId);
+      if (idx >= 0) db.flights[idx] = flightData;
+    } else {
+      db.flights.unshift(flightData);
+    }
+
+    const a = db.aircraft.find(x => x.id === fd.aircraftId);
+    if (a) a.status = 'Prêt';
+    
+    await save();
+    closeModal();
+    if (selectedId) showAircraft(selectedId);
+  };
+}
+
+// Rendu des lignes du carnet de vol
+function flightRow(f) {
+  const a = db.aircraft.find(a => a.id === f.aircraftId);
+  const infoFrom = getCoords(f.from);
+  const infoTo = getCoords(f.to);
+
+  return `
+    <div class="flight">
+      <div>
+        <div class="route">
+          ${f.flightNumber ? `<span style="background:#173650;color:#39a2ff;padding:2px 6px;border-radius:6px;font-size:12px;margin-right:6px">${esc(f.flightNumber)}</span>` : ''}
+          ${esc(f.from)} <span style="color:var(--blue)">→</span> ${esc(f.to)}
+        </div>
+        <div class="tiny" style="color:var(--text);margin-top:2px">
+          ${esc(infoFrom?.name || f.from)} ➔ ${esc(infoTo?.name || f.to)}
+        </div>
+        <div class="tiny">${esc(f.date||'')} · ${esc(a?.name||'Avion supprimé')}</div>
+        ${f.notes ? `<div class="tiny" style="margin-top:4px"><i>${esc(f.notes)}</i></div>` : ''}
+      </div>
+      <div style="text-align:right;white-space:nowrap">
+        <b>${pretty(f.seconds)}</b>
+        <div style="margin-top:7px;display:flex;gap:4px;justify-content:flex-end">
+          <button class="secondary" style="padding:4px 8px;font-size:11px" onclick="openFlightForm('${f.id}')">✎ Modifier</button>
+          <button class="danger" style="padding:4px 8px;font-size:11px" onclick="deleteFlight('${f.id}')">✕</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderFlights() {
+  const filter = document.getElementById('flightFilter');
+  if (filter) {
+    const val = filter.value;
+    filter.innerHTML = '<option value="">Tous les avions</option>' + db.aircraft.map(a => `<option value="${a.id}" ${val===a.id?'selected':''}>${esc(a.name)}</option>`).join('');
+  }
+  const id = filter?.value || '';
+  const flights = db.flights.filter(f => !id || f.aircraftId === id).sort((a,b) => (b.date||'').localeCompare(a.date||''));
+  document.getElementById('flightTotal').textContent = pretty(flights.reduce((s,f) => s + (+f.seconds||0), 0));
+  document.getElementById('flightList').innerHTML = flights.map(flightRow).join('') || '<div class="empty">Aucun vol pour le moment.</div>';
+}
+
+function deleteFlight(id) {
+  if (!confirm('Supprimer ce vol ?')) return;
+  db.flights = db.flights.filter(f => f.id !== id);
+  save();
+}
+
+// Carte Leaflet & Gestion API
+function getTileLayer(forceProvider) {
+  const s = db.settings || {};
+  const provider = forceProvider || s.mapProvider || 'osm';
+  const key = (s.apiKey || '').trim();
+
+  if (provider === 'mapbox' && key) {
+    return L.tileLayer(`https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/{z}/{x}/{y}?access_token=${key}`, {
+      attribution: '&copy; Mapbox &copy; OpenStreetMap', tileSize: 512, zoomOffset: -1, maxZoom: 18
+    });
+  }
+  if (provider === 'locationiq' && key) {
+    return L.tileLayer(`https://{s}-tiles.locationiq.com/v3/streets/r/{z}/{x}/{y}.png?key=${key}`, {
+      attribution: '&copy; LocationIQ &copy; OpenStreetMap', maxZoom: 18
+    });
+  }
+  if (provider === 'custom' && s.customUrl) {
+    return L.tileLayer(s.customUrl, { attribution: 'Custom Tile Server', maxZoom: 18 });
+  }
+  if (provider === 'carto') {
+    return L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO', maxZoom: 18
+    });
+  }
+  // OpenStreetMap : aucune clé API nécessaire
+  return L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom: 19,
+    className: provider === 'osm_light' ? '' : 'tiles-dark'
+  });
+}
+
+function initOrUpdateMap() {
+  const container = document.getElementById('mapContainer');
+  if (!container) return;
+  
+  if (leafletMap) {
+    leafletMap.remove();
+    leafletMap = null;
+  }
+  
+  leafletMap = L.map('mapContainer').setView([46.5, 2.5], 4);
+  let tl = getTileLayer().addTo(leafletMap), tileErrs = 0, fellBack = false;
+  tl.on('tileerror', () => {
+    tileErrs++;
+    if (tileErrs >= 4 && !fellBack) {
+      fellBack = true;
+      leafletMap.removeLayer(tl);
+      tl = getTileLayer('carto').addTo(leafletMap);
+      console.warn('Fond de carte indisponible : repli sur CartoDB Dark');
+    }
+  });
+  mapLayers = [];
+  const bounds = [];
+
+  db.flights.forEach(f => {
+    const cFrom = getCoords(f.from);
+    const cTo = getCoords(f.to);
+    const aircraft = db.aircraft.find(a => a.id === f.aircraftId);
+
+    if (cFrom && cTo) {
+      const latlngs = [[cFrom.lat, cFrom.lng], [cTo.lat, cTo.lng]];
+      bounds.push([cFrom.lat, cFrom.lng]);
+      bounds.push([cTo.lat, cTo.lng]);
+
+      const polyline = L.polyline(latlngs, {
+        color: '#39a2ff',
+        weight: 3,
+        opacity: 0.85,
+        dashArray: '6, 6'
+      }).addTo(leafletMap);
+
+      const popupHtml = `
+        <div class="map-popup-title">${f.flightNumber ? `[${esc(f.flightNumber)}] ` : ''}${esc(f.from)} ➔ ${esc(f.to)}</div>
+        <div class="map-popup-sub">
+          <b>Départ:</b> ${esc(cFrom.name)}<br>
+          <b>Arrivée:</b> ${esc(cTo.name)}<br>
+          <b>Avion:</b> ${esc(aircraft?.name || 'Inconnu')}<br>
+          <b>Date:</b> ${esc(f.date)} · <b>Durée:</b> ${pretty(f.seconds)}
+        </div>
+        ${f.notes ? `<div class="tiny" style="margin-bottom:8px"><i>${esc(f.notes)}</i></div>` : ''}
+        <div class="map-popup-actions">
+          <button style="padding:4px 8px;font-size:11px" onclick="openFlightForm('${f.id}')">✎ Modifier</button>
+          <button class="danger" style="padding:4px 8px;font-size:11px" onclick="deleteFlight('${f.id}')">Supprimer</button>
+        </div>
+      `;
+
+      polyline.bindPopup(popupHtml);
+      mapLayers.push(polyline);
+
+      [cFrom, cTo].forEach(c => {
+        const marker = L.circleMarker([c.lat, c.lng], {
+          radius: 6,
+          fillColor: '#48d6a0',
+          color: '#ffffff',
+          weight: 1.5,
+          opacity: 1,
+          fillOpacity: 0.9
+        }).addTo(leafletMap);
+        marker.bindPopup(`<b>${esc(c.name)}</b> (${esc(c.code)})`);
+        mapLayers.push(marker);
+      });
+    }
+  });
+
+  if (bounds.length > 0) {
+    leafletMap.fitBounds(bounds, { padding: [35, 35] });
+  }
+  
+  setTimeout(() => { if (leafletMap) leafletMap.invalidateSize(); }, 250);
+}
+
+// Configuration API Carte
+function toggleApiTokenField() {
+  const provider = document.getElementById('mapProvider').value;
+  const tokenGroup = document.getElementById('apiTokenGroup');
+  const customGroup = document.getElementById('customUrlGroup');
+  
+  tokenGroup.style.display = (provider === 'mapbox' || provider === 'locationiq') ? 'block' : 'none';
+  customGroup.style.display = (provider === 'custom') ? 'block' : 'none';
+}
+
+function populateMapSettingsForm() {
+  const s = db.settings || {};
+  if (document.getElementById('mapProvider')) {
+    document.getElementById('mapProvider').value = s.mapProvider || 'osm';
+    document.getElementById('mapApiKey').value = s.apiKey || '';
+    document.getElementById('mapCustomUrl').value = s.customUrl || '';
+    toggleApiTokenField();
+  }
+}
+
+function saveMapSettings(e) {
+  e.preventDefault();
+  db.settings = {
+    mapProvider: document.getElementById('mapProvider').value,
+    apiKey: document.getElementById('mapApiKey').value.trim(),
+    customUrl: document.getElementById('mapCustomUrl').value.trim()
+  };
+  save();
+  alert('Configuration de la carte enregistrée !');
+}
+
+// Documents PDF
+function openDocForm(aircraftId='') {
+  openModal('Ajouter un document', `
+    <form id="docForm" class="formgrid">
+      <div class="field full">
+        <label>Nom du document *</label>
+        <input name="name" required placeholder="Check-list avant décollage">
+      </div>
+      <div>
+        <label>Type</label>
+        <select name="type">
+          <option>Check-list</option>
+          <option>Manuel</option>
+          <option>Procédure d’urgence</option>
+          <option>Autre</option>
+        </select>
+      </div>
+      <div>
+        <label>Associer à un avion</label>
+        <select name="aircraftId">
+          <option value="">Document général</option>
+          ${db.aircraft.map(a => `<option value="${a.id}" ${a.id===aircraftId?'selected':''}>${esc(a.name)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field full">
+        <label>Fichier PDF (facultatif)</label>
+        <input type="file" name="file" accept="application/pdf,.pdf">
+      </div>
+      <div class="field full">
+        <label>Notes</label>
+        <textarea name="notes" rows="2"></textarea>
+      </div>
+      <div class="field full">
+        <button style="width:100%">Enregistrer le document</button>
+      </div>
+    </form>
+  `);
+
+  document.getElementById('docForm').onsubmit = async e => {
+    e.preventDefault();
+    const form = e.currentTarget, d = Object.fromEntries(new FormData(form).entries()), file = form.elements.file.files[0];
+    let data = '';
+    if (file) {
+      data = await new Promise((resolve, reject) => {
+        const r = new FileReader();
+        r.onload = () => resolve(r.result);
+        r.onerror = reject;
+        r.readAsDataURL(file);
+      });
+    }
+    const doc = { id: uid(), name: d.name, type: d.type, aircraftId: d.aircraftId, notes: d.notes, fileName: file?.name || '', data };
+    if (file) {
+      doc.fileKey = doc.id;
+      try { await putFile(doc.fileKey, data); } catch(err) { alert('Espace de stockage plein.'); return; }
+    }
+    db.docs.unshift(doc);
+    await save();
+    closeModal();
+    if (selectedId && document.getElementById('view-detail').classList.contains('active')) showAircraft(selectedId);
+  };
+}
+
+function docRow(d) {
+  const a = db.aircraft.find(a => a.id === d.aircraftId);
+  return `
+    <div class="docrow">
+      <div style="min-width:0">
+        <div style="font-weight:700">▤ ${esc(d.name)}</div>
+        <div class="tiny">${esc(d.type)} · ${esc(a?.name||'Document général')}${d.fileName ? ' · ' + esc(d.fileName) : ''}</div>
+        ${d.notes ? `<div class="tiny">${esc(d.notes)}</div>` : ''}
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        ${(d.data||d.fileKey) ? `<button class="secondary" onclick="openPdf('${d.id}')">Ouvrir</button>` : ''}
+        <button class="danger" onclick="deleteDoc('${d.id}')">✕</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderDocs() {
+  document.getElementById('docList').innerHTML = db.docs.map(docRow).join('') || '<div class="empty">Aucun document classé.</div>';
+}
+
+async function openPdf(id) {
+  const d = db.docs.find(x => x.id === id); if (!d) return;
+  try {
+    let payload = d.data || ''; if (!payload && d.fileKey) payload = await getFile(d.fileKey);
+    if (!payload) { alert('Fichier introuvable.'); return; }
+    let blob;
+    if (payload.startsWith('data:')) {
+      const parts = payload.split(',');
+      const mime = (parts[0].match(/data:([^;]+)/)||[])[1] || 'application/pdf';
+      const raw = atob(parts[1]);
+      const bytes = new Uint8Array(raw.length);
+      for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+      blob = new Blob([bytes], { type: mime });
+    } else if (payload instanceof Blob) blob = payload;
+    
+    const url = URL.createObjectURL(blob);
+    window.open(url, '_blank');
+    setTimeout(() => URL.revokeObjectURL(url), 120000);
+  } catch(e) { console.error(e); alert('Erreur d’ouverture du PDF.'); }
+}
+
+function deleteDoc(id) {
+  if (!confirm('Supprimer ce document ?')) return;
+  db.docs = db.docs.filter(d => d.id !== id);
+  save();
+}
+
+// Export & Import JSON
+async function exportData() {
+  try {
+    const full = {
+      ...db,
+      aircraft: await Promise.all(db.aircraft.map(async a => ({ ...a, photo: a.photo || (a.photoKey ? await getFile(a.photoKey) : '') }))),
+      docs: await Promise.all(db.docs.map(async d => ({ ...d, data: d.data || (d.fileKey ? await getFile(d.fileKey) : '') })))
+    };
+    const blob = new Blob([JSON.stringify(full, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'myfleet-backup.json';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  } catch(e) { alert('Exportation impossible.'); console.error(e); }
+}
+
+function importData() {
+  const file = document.getElementById('importJson').files[0];
+  if (!file) { alert('Sélectionnez un fichier JSON.'); return; }
+  const r = new FileReader();
+  r.onload = async () => {
+    try {
+      const x = JSON.parse(r.result);
+      if (!Array.isArray(x.aircraft) || !Array.isArray(x.flights) || !Array.isArray(x.docs)) throw Error();
+      if (!confirm('Remplacer les données actuelles par la sauvegarde ?')) return;
+      
+      for (const a of x.aircraft) {
+        if (a.photo) {
+          a.photoKey = a.photoKey || 'photo_' + (a.id || uid());
+          await putFile(a.photoKey, a.photo);
+        }
+      }
+      for (const d of x.docs) {
+        if (d.data) {
+          d.fileKey = d.fileKey || d.id || uid();
+          await putFile(d.fileKey, d.data);
+        }
+      }
+      db = x;
+      await save();
+      alert('Sauvegarde importée avec succès !');
+    } catch(e) { alert('Fichier JSON invalide.'); console.error(e); }
+  };
+  r.readAsText(file);
+}
+
+function resetData() {
+  if (!confirm('Effacer toutes les données ? Cette action est irréversible.')) return;
+  db = { aircraft: [], flights: [], docs: [], settings: { mapProvider: 'osm', apiKey: '', customUrl: '' } };
+  Object.keys(running).forEach(k => delete running[k]);
+  save();
+  navigate('fleet');
+}
+
+load();
+</script>
+</body>
+</html>
